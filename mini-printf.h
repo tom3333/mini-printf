@@ -31,20 +31,24 @@
 #ifndef __MINI_PRINTF__
 #define __MINI_PRINTF__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+/* *******************************************************************
+ * includes
+ * ******************************************************************/
 #include <stdarg.h>
 
-int mini_vsnprintf(char* buffer, unsigned int buffer_len, const char *fmt, va_list va);
-int mini_snprintf(char* buffer, unsigned int buffer_len, const char *fmt, ...);
-
-#ifdef __cplusplus
-}
-#endif
-
+/* *******************************************************************
+ * defines
+ * ******************************************************************/
 #define vsnprintf mini_vsnprintf
 #define snprintf mini_snprintf
+
+/* *******************************************************************
+ * global functions declaration
+ * ******************************************************************/
+unsigned int mini_strlen(const char *s);
+int mini_vsnprintf(char* buffer, unsigned int buffer_len, const char * const fmt, va_list va);
+int mini_snprintf(char* buffer, unsigned int buffer_len, const char * const fmt, ...);
+int mini_vsscanf(const char * buf, const char * fmt, va_list args);
+int mini_sscanf(const char * buf, const char * fmt, ...);
 
 #endif
