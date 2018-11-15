@@ -50,6 +50,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <stdint.h>
+#include <ctype.h>
 
 /* *******************************************************************
  * defines
