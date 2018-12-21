@@ -1,10 +1,11 @@
 project(lib_mini_printf)
 
-#However, the file(GLOB...) allows for wildcard additions:
-file(GLOB SOURCES "mini-printf.c")
 
+SET(LIB_MINI_PRINTF_SOURCE_C   		    "src/mini-printf.c")
+SET(LIB_MINI_PRINTF_INTERFACE_HEADER    "include")
 
-#Generate the static library from the sources
-
-add_library(${PROJECT_NAME} STATIC ${SOURCES})
-target_include_directories(${PROJECT_NAME} PUBLIC ./)
+#######################################################################################
+#Build target settings
+#######################################################################################
+add_library(${PROJECT_NAME} STATIC ${LIB_MINI_PRINTF_SOURCE_C})
+target_include_directories(${PROJECT_NAME} PUBLIC ${LIB_MINI_PRINTF_INTERFACE_HEADER})

@@ -44,14 +44,16 @@
 /* *******************************************************************
  * includes
  * ******************************************************************/
-#include "mini-printf.h"
 
+/*c-runtime*/
 #include <string.h>
 #include <stdarg.h>
 #include <limits.h>
 #include <stdint.h>
-#include <ctype.h>
+#include <ctype.h> 
 
+/*project*/
+#include "mini-printf.h"
 /* *******************************************************************
  * defines
  * ******************************************************************/
@@ -60,11 +62,26 @@
 	//#define unlikely(x)   (__builtin_constant_p(x) ? !!(x) : __branch_check__(x, 0))
 # endif
 
+#define ZEROPAD 1               /* pad with zero */
+#define SIGN    2               /* unsigned/signed long */
+#define PLUS    4               /* show plus */
+#define SPACE   8               /* space if plus */
+#define LEFT    16              /* left justified */
+#define SPECIAL 32              /* 0x */
+#define LARGE   64              /* use 'ABCDEF' instead of 'abcdef' */
+
 /* *******************************************************************
  * Static Function Prototypes
  * ******************************************************************/
-static unsigned int mini_itoa(int value, unsigned int radix, unsigned int uppercase, unsigned int unsig,
-	 char *buffer, unsigned int zero_pad);
+static unsigned int mini_itoa(int value, unsigned int radix, unsigned int uppercase, unsigned int unsig, char *buffer, unsigned int zero_pad);
+static int _putc(char ch, char* buffer, char **pbuffer, unsigned int buffer_len);
+static int _puts(char *s, unsigned int len, char* buffer, char **pbuffer, unsigned int buffer_len);
+static unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
+static long simple_strtol(const char *cp,char **endp,unsigned int base);
+static unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base);
+static long long simple_strtoll(const char *cp,char **endp,unsigned int base);
+static int skip_atoi(const char **s);
+
 /* *******************************************************************
  * Global Functions
  * ******************************************************************/
@@ -82,35 +99,11 @@ int mini_vsnprintf(char *buffer, unsigned int buffer_len, const char * const fmt
 	char bf[24];
 	char ch;
 
-	int _putc(char ch)
-	{
-		if ((unsigned int)((pbuffer - buffer) + 1) >= buffer_len)
-			return 0;
-		*(pbuffer++) = ch;
-		*(pbuffer) = '\0';
-		return 1;
-	}
-
-	int _puts(char *s, unsigned int len)
-	{
-		unsigned int i;
-
-		if (buffer_len - (pbuffer - buffer) - 1 < len)
-			len = buffer_len - (pbuffer - buffer) - 1;
-
-		/* Copy to buffer */
-		for (i = 0; i < len; i++)
-			*(pbuffer++) = s[i];
-		*(pbuffer) = '\0';
-
-		return len;
-	}
-
 	while ((ch=*(local_fmt++))) {
 		if ((unsigned int)((pbuffer - buffer) + 1) >= buffer_len)
 			break;
 		if (ch!='%')
-			_putc(ch);
+			_putc(ch, buffer, &pbuffer, buffer_len);
 		else {
 			char zero_pad = 0;
 			char *ptr;
@@ -134,32 +127,32 @@ int mini_vsnprintf(char *buffer, unsigned int buffer_len, const char * const fmt
 
 				case 'i':
 					len = mini_itoa(va_arg(va, int), 10, 0, 0, bf, zero_pad);
-					_puts(bf, len);
+					_puts(bf, len, buffer, &pbuffer, buffer_len);
 					break;
 
 				case 'u':
 				case 'd':
 					len = mini_itoa(va_arg(va, unsigned int), 10, 0, (ch=='u'), bf, zero_pad);
-					_puts(bf, len);
+					_puts(bf, len, buffer, &pbuffer, buffer_len);
 					break;
 
 				case 'x':
 				case 'X':
 					len = mini_itoa(va_arg(va, unsigned int), 16, (ch=='X'), 1, bf, zero_pad);
-					_puts(bf, len);
+					_puts(bf, len, buffer, &pbuffer, buffer_len);
 					break;
 
 				case 'c' :
-					_putc((char)(va_arg(va, int)));
+					_putc((char)(va_arg(va, int)), buffer, &pbuffer, buffer_len);
 					break;
 
 				case 's' :
 					ptr = va_arg(va, char*);
-					_puts(ptr, mini_strlen(ptr));
+					_puts(ptr, mini_strlen(ptr), buffer, &pbuffer, buffer_len);
 					break;
 
 				default:
-					_putc(ch);
+					_putc(ch, buffer, &pbuffer, buffer_len);
 					break;
 			}
 		}
@@ -179,113 +172,6 @@ int mini_snprintf(char* buffer, unsigned int buffer_len, const char * const fmt,
 
 	return ret;
 }
-
-
-
-
-
-unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
-{
-    unsigned long result = 0,value;
-
-    if (!base) {
-        base = 10;
-        if (*cp == '0') {
-            base = 8;
-            cp++;
-            if ((*cp == 'x') && isxdigit(cp[1])) {
-                cp++;
-                base = 16;
-            }
-        }
-    }
-    while (isxdigit(*cp) &&
-           (value = isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10) < base) {
-        result = result*base + value;
-        cp++;
-    }
-    if (endp)
-        *endp = (char *)cp;
-    return result;
-}
-
-/**
- * simple_strtol - convert a string to a signed long
- * @cp: The start of the string
- * @endp: A pointer to the end of the parsed string will be placed here
- * @base: The number base to use
- */
-long simple_strtol(const char *cp,char **endp,unsigned int base)
-{
-    if(*cp=='-')
-        return -simple_strtoul(cp+1,endp,base);
-    return simple_strtoul(cp,endp,base);
-}
-
-/**
- * simple_strtoull - convert a string to an unsigned long long
- * @cp: The start of the string
- * @endp: A pointer to the end of the parsed string will be placed here
- * @base: The number base to use
- */
-unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
-{
-    unsigned long long result = 0,value;
-
-    if (!base) {
-        base = 10;
-        if (*cp == '0') {
-            base = 8;
-            cp++;
-            if ((*cp == 'x') && isxdigit(cp[1])) {
-                cp++;
-                base = 16;
-            }
-        }
-    }
-    while (isxdigit(*cp) && (value = isdigit(*cp) ? *cp-'0' : (islower(*cp)
-                                                               ? toupper(*cp) : *cp)-'A'+10) < base) {
-        result = result*base + value;
-        cp++;
-    }
-    if (endp)
-        *endp = (char *)cp;
-    return result;
-}
-
-/**
- * simple_strtoll - convert a string to a signed long long
- * @cp: The start of the string
- * @endp: A pointer to the end of the parsed string will be placed here
- * @base: The number base to use
- */
-long long simple_strtoll(const char *cp,char **endp,unsigned int base)
-{
-    if(*cp=='-')
-        return -simple_strtoull(cp+1,endp,base);
-    return simple_strtoull(cp,endp,base);
-}
-
-static int skip_atoi(const char **s)
-{
-    int i=0;
-
-    while (isdigit(**s))
-        i = i*10 + *((*s)++) - '0';
-    return i;
-}
-
-
-
-
-
-#define ZEROPAD 1               /* pad with zero */
-#define SIGN    2               /* unsigned/signed long */
-#define PLUS    4               /* show plus */
-#define SPACE   8               /* space if plus */
-#define LEFT    16              /* left justified */
-#define SPECIAL 32              /* 0x */
-#define LARGE   64              /* use 'ABCDEF' instead of 'abcdef' */
 
 /**
  * vsscanf - Unformat a buffer into a list of arguments
@@ -520,9 +406,10 @@ int mini_sscanf(const char * buf, const char * fmt, ...)
 	return i;
 }
 
-
-static unsigned int mini_itoa(int value, unsigned int radix, unsigned int uppercase, unsigned int unsig,
-	 char *buffer, unsigned int zero_pad)
+/* *******************************************************************
+ * Static Function Definitions
+ * ******************************************************************/
+static unsigned int mini_itoa(int value, unsigned int radix, unsigned int uppercase, unsigned int unsig, char *buffer, unsigned int zero_pad)
 {
 	char	*pbuffer = buffer;
 	int	negative = 0;
@@ -562,4 +449,117 @@ static unsigned int mini_itoa(int value, unsigned int radix, unsigned int upperc
 	}
 
 	return len;
+}
+
+static int _putc(char ch, char* buffer, char **pbuffer, unsigned int buffer_len)
+{
+	if ((unsigned int)((*pbuffer - buffer) + 1) >= buffer_len)
+		return 0;
+	*((*pbuffer)++) = ch;
+	**pbuffer = '\0';
+	return 1;
+}
+
+static int _puts(char *s, unsigned int len, char* buffer, char **pbuffer, unsigned int buffer_len)
+{
+	unsigned int i;
+	if (buffer_len - (*pbuffer - buffer) - 1 < len)
+		len = buffer_len - (*pbuffer - buffer) - 1;
+
+	/* Copy to buffer */
+	for (i = 0; i < len; i++)
+		*((*pbuffer)++) = s[i];
+	**pbuffer = '\0';
+	return len;
+}
+
+static unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
+{
+    unsigned long result = 0,value;
+
+    if (!base) {
+        base = 10;
+        if (*cp == '0') {
+            base = 8;
+            cp++;
+            if ((*cp == 'x') && isxdigit(cp[1])) {
+                cp++;
+                base = 16;
+            }
+        }
+    }
+    while (isxdigit(*cp) &&
+           (value = isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10) < base) {
+        result = result*base + value;
+        cp++;
+    }
+    if (endp)
+        *endp = (char *)cp;
+    return result;
+}
+
+/**
+ * simple_strtol - convert a string to a signed long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+long simple_strtol(const char *cp,char **endp,unsigned int base)
+{
+    if(*cp=='-')
+        return -simple_strtoul(cp+1,endp,base);
+    return simple_strtoul(cp,endp,base);
+}
+
+/**
+ * simple_strtoull - convert a string to an unsigned long long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+static unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
+{
+    unsigned long long result = 0,value;
+
+    if (!base) {
+        base = 10;
+        if (*cp == '0') {
+            base = 8;
+            cp++;
+            if ((*cp == 'x') && isxdigit(cp[1])) {
+                cp++;
+                base = 16;
+            }
+        }
+    }
+    while (isxdigit(*cp) && (value = isdigit(*cp) ? *cp-'0' : (islower(*cp)
+                                                               ? toupper(*cp) : *cp)-'A'+10) < base) {
+        result = result*base + value;
+        cp++;
+    }
+    if (endp)
+        *endp = (char *)cp;
+    return result;
+}
+
+/**
+ * simple_strtoll - convert a string to a signed long long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+static long long simple_strtoll(const char *cp,char **endp,unsigned int base)
+{
+    if(*cp=='-')
+        return -simple_strtoull(cp+1,endp,base);
+    return simple_strtoull(cp,endp,base);
+}
+
+static int skip_atoi(const char **s)
+{
+    int i=0;
+
+    while (isdigit(**s))
+        i = i*10 + *((*s)++) - '0';
+    return i;
 }
